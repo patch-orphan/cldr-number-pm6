@@ -156,9 +156,8 @@ method percent (Num $num) {
     return $num * 100;
 };
 
-sub per_mille {
-    my ($self, $num) = @_;
-    my $res = $self->percent_pattern;
+method per_mille {
+    my $res = $.percent_pattern;
 
     return $num * 1000;
 };
