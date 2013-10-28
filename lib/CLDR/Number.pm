@@ -1,17 +1,6 @@
-package CLDR::Number;
+class CLDR::Number;
 
-use v5.8.1;
-use utf8;
-use strict;
-use warnings;
-use charnames qw( :full );
-use Moo;
-use Carp qw( carp croak );
-use Scalar::Util qw( looks_like_number );
-use List::Util qw( any );
-
-our $VERSION      = '0.00';
-our $CLDR_VERSION = '24';
+constant $CLDR_VERSION = '24';
 
 # XXX: data for testing
 my %locales = (
@@ -43,8 +32,8 @@ my %locales = (
         group_sign            => '٬',
         list_sign             => '؛',
         percent_sign          => '٪',
-        plus_sign             => "\N{RIGHT-TO-LEFT MARK}+",
-        minus_sign            => "\N{RIGHT-TO-LEFT MARK}-",
+        plus_sign             => "\c[RIGHT-TO-LEFT MARK]+",
+        minus_sign            => "\c[RIGHT-TO-LEFT MARK]-",
         exponent_sign         => 'ﺎﺳ',
         per_mille_sign        => '؉',
         nan_sign              => 'ﻞﻴﺳ ﺮﻘﻣ',
@@ -71,7 +60,7 @@ my %locales = (
 );
 
 # TODO: patternDigit
-my @attributes = qw{
+my @attributes = <
     default_number_system
     other_number_systems
     decimal_sign
@@ -91,136 +80,105 @@ my @attributes = qw{
     currency_pattern
     at_least_pattern
     range_pattern
-};
+>;
 
-my @optional_attributes = qw{
+my @optional_attributes = <
     currency_decimal_sign
     currency_group_sign
-};
+>;
 
-for my $attribute (@attributes, @optional_attributes) {
-    has $attribute => (is => 'rw');
-}
+has $.default_number_system is rw;
+has $.other_number_systems is rw;
+has $.decimal_sign is rw;
+has $.group_sign is rw;
+has $.list_sign is rw;
+has $.percent_sign is rw;
+has $.plus_sign is rw;
+has $.minus_sign is rw;
+has $.exponent_sign is rw;
+has $.superscript_exponent_sign is rw;
+has $.per_mille_sign is rw;
+has $.infinity_sign is rw;
+has $.nan_sign is rw;
+has $.decimal_pattern is rw;
+has $.percent_pattern is rw;
+has $.scientific_pattern is rw;
+has $.currency_pattern is rw;
+has $.at_least_pattern is rw;
+has $.range_pattern is rw;
+has $.currency_decimal_sign is rw;
+has $.currency_group_sign is rw;
+has $.attribute is rw;
 
-has cldr_version => (
-    is      => 'ro',
-    default => $CLDR_VERSION,
-);
+has $.cldr_version = $CLDR_VERSION;
 
-has locale => (
-    is      => 'rw',
-    isa     => sub {
-        croak "Locale is not defined"  unless defined $_[0];
-        croak "Invalid locale '$_[0]'" unless exists $locales{$_[0]};
-    },
-    trigger => 1,
-    default => 'en',
-);
+# TODO: validate
+has $.locale is rw = 'en';
 
-has currency_code => (
-    is => 'rw',
-);
+has $.currency_code is rw;
 
-sub BUILD {
-    my ($self) = @_;
-
-    for my $attribute (@attributes, @optional_attributes) { 
-        next if defined $self->$attribute;
-        $self->$attribute(
-            $locales{$self->locale}{$attribute} || $locales{root}{$attribute}
-        );
+submethod BUILD (:$.locale, *%) {
+    for @attributes, @optional_attributes -> $attribute {
+        next if self.$attribute.defined;
+        self.$attribute = %locales{$.locale}{$attribute}
+                       // %locales{root}{$attribute};
     }
 }
 
-sub _trigger_locale {
-    my ($self) = @_;
-
-    for my $attribute (@attributes, @optional_attributes) { 
-        $self->$attribute(
-            $locales{$self->locale}{$attribute} || $locales{root}{$attribute}
-        );
+submethod locale ($.locale) {
+    for @attributes, @optional_attributes -> $attribute {
+        self.$attribute = %locales{$.locale}{$attribute}
+                       // %locales<root>{$attribute};
     }
 }
 
-sub decimal {
-    my ($self, $num) = @_;
-
-    if (!defined $num) {
-        carp 'Use of uninitialized value in CLDR::Number->decimal';
-        return undef;
-    }
-
-    if (!looks_like_number $num) {
-        carp 'Use of invalid number in CLDR::Number->decimal';
-        return $num;
-    }
-
-    $num += 0;
-
+method decimal (Num $num) {
     my $negative = $num < 0;
 
-    my $pattern = $self->decimal_pattern;
-    my $decimal = $self->decimal_sign;
-    my $group   = $self->group_sign;
+    return $num;
+};
+
+method short_decimal (Num $num) {
+    #my $res = $.short_decimal_pattern;
 
     return $num;
 };
 
-sub short_decimal {
-    my ($self, $num) = @_;
-    #my $res = $self->short_decimal_pattern;
+method long_decimal (Num $num) {
+    #my $res = $.long_decimal_pattern;
 
     return $num;
 };
 
-sub long_decimal {
-    my ($self, $num) = @_;
-    #my $res = $self->long_decimal_pattern;
+method percent (Num $num) {
+    my $res = $.percent_pattern;
 
     return $num;
 };
 
-sub percent {
-    my ($self, $num) = @_;
-    my $res = $self->percent_pattern;
+method scientific (Num $num) {
+    my $res = $.scientific_pattern;
 
     return $num;
 };
 
-sub scientific {
-    my ($self, $num) = @_;
-    my $res = $self->scientific_pattern;
+method currency (Num $num) {
+    my $res = $.currency_pattern;
 
     return $num;
 };
 
-sub currency {
-    my ($self, $num) = @_;
-    my $res = $self->currency_pattern;
-
-    return $num;
+method at_least (Num $num) {
+    return $.at_least_pattern.subst(
+        '{0}' => $.decimal($num)
+    );
 };
 
-sub at_least {
-    my $self = shift;
-    my $num  = $self->decimal(shift);
-    my $res  = $self->at_least_pattern;
-
-    $res =~ s/[{]0[}]/$num/;
-
-    return $res;
-};
-
-sub range {
-    my $self = shift;
-    my $num0 = $self->decimal(shift);
-    my $num1 = $self->decimal(shift);
-    my $res  = $self->range_pattern;
-
-    $res =~ s/[{]0[}]/$num0/;
-    $res =~ s/[{]1[}]/$num1/;
-
-    return $res;
+method range (Num $num0, $num1) {
+    return $.range_pattern.subst(
+        '{0}' => $.decimal($num0),
+        '{1}' => $.decimal($num1),
+    );
 };
 
 1;
@@ -235,35 +193,35 @@ CLDR::Number - Unicode CLDR formatter for numbers
 
     use CLDR::Number;
 
-    CLDR::Number->locales          # list
-    CLDR::Number->is_locale('es')  # true
-    CLDR::Number->is_locale('xx')  # false
+    CLDR::Number.locales          # list
+    CLDR::Number.is_locale('es')  # true
+    CLDR::Number.is_locale('xx')  # false
 
-    CLDR::Number->currencies          # list
-    CLDR::Number->is_currency('EUR')  # true
-    CLDR::Number->is_currency('XXX')  # false
+    CLDR::Number.currencies          # list
+    CLDR::Number.is_currency('EUR')  # true
+    CLDR::Number.is_currency('XXX')  # false
 
-    $numf = CLDR::Number->new(
+    $numf = CLDR::Number.new(
         locale        => 'es',
         currency_code => 'USD',
     );
 
-    $numf->decimal(1337)   # 1.337
-    $numf->decimal(-1337)  # -1.337
-    $numf->percent(1337)   # 1.337%
-    $numf->currency(1337)  # 1.337,00 $
+    $numf.decimal(1337)   # 1.337
+    $numf.decimal(-1337)  # -1.337
+    $numf.percent(1337)   # 1.337%
+    $numf.currency(1337)  # 1.337,00 $
 
-    $numf->precision(3);
-    $numf->currency_code('EUR');
-    $numf->decimal(1337)   # 1.337,000
-    $numf->percent(1337)   # 1.337,000%
-    $numf->currency(1337)  # 1.337,00 €
+    $numf.precision = 3;
+    $numf.currency_code = 'EUR';
+    $numf.decimal(1337)   # 1.337,000
+    $numf.percent(1337)   # 1.337,000%
+    $numf.currency(1337)  # 1.337,00 €
 
-    $numf->locale('en');
-    $numf->short_decimal(2337)     # 2K
-    $numf->short_decimal(1337123)  # 1M
-    $numf->long_decimal(2337)      # 2 thousand
-    $numf->long_decimal(1337123)   # 1 million
+    $numf.locale = 'en';
+    $numf.short_decimal(2337)     # 2K
+    $numf.short_decimal(1337123)  # 1M
+    $numf.long_decimal(2337)      # 2 thousand
+    $numf.long_decimal(1337123)   # 1 million
 
 =head1 METHODS
 
